@@ -1,4 +1,5 @@
 # Registro de Pacientes
+[![CI](https://github.com/Registro-de-pacientes/Registro-de-pacientes/actions/workflows/ci.yml/badge.svg)](https://github.com/Registro-de-pacientes/Registro-de-pacientes/actions/workflows/ci.yml)
 
 Aplicação desktop em PyQt5 para registro diário de pacientes na recepção do Caps AD III Paulo da Portela. O programa mantém um banco SQLite local (`patients.db`), oferece filtros e dashboards para as demandas e refeições servidas e executa cópias de segurança automáticas.
 
