@@ -60,7 +60,7 @@ def get_backup_root(parent=None) -> Optional[Path]:
             _save_cfg(cfg)
 
 
-def backup_now(parent=None) -> None:
+def backup_now(parent=None, now: Optional[datetime] = None) -> None:
     """
     Copia patients.db para:
         <pasta-backup>\\AAAA-MM\\<DD>\\patients_HH-MM-SS.db
@@ -70,7 +70,7 @@ def backup_now(parent=None) -> None:
         return
 
     try:
-        now = datetime.now()
+        now = now or datetime.now()
         month_dir = root / now.strftime("%Y-%m")
         day_dir = month_dir / now.strftime("%d")
         day_dir.mkdir(parents=True, exist_ok=True)

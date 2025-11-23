@@ -44,14 +44,9 @@ def test_backup_now_creates_timestamped_copy(tmp_path, monkeypatch):
     backup_root = tmp_path / "backup"
     monkeypatch.setattr(registro_pac, "get_backup_root", lambda parent=None: backup_root)
 
-    class FixedDateTime:
-        @classmethod
-        def now(cls):
-            return real_datetime(2024, 1, 2, 3, 4, 5)
+    fixed_time = real_datetime(2024, 1, 2, 3, 4, 5)
 
-    monkeypatch.setattr(registro_pac, "datetime", FixedDateTime)
-
-    registro_pac.backup_now(parent=None)
+    registro_pac.backup_now(parent=None, now=fixed_time)
 
     expected = backup_root / "2024-01" / "02" / "patients_03-04-05.db"
     assert expected.exists()
