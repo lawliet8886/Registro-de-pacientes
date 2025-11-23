@@ -23,7 +23,15 @@ from PyQt5.QtWidgets import (
     QDateEdit, QTabWidget, QFileDialog, QProgressDialog, QInputDialog,
 )
 
-from infra import DB_PATH, backup_now, init_db, _fix_old_imports
+from infra import (
+    CONFIG_FILE,
+    DB_PATH,
+    _load_cfg,
+    _save_cfg,
+    backup_now,
+    init_db,
+    _fix_old_imports,
+)
 from ui.dialogs import (
     EncaminhamentoDialog,
     SearchDialog,
