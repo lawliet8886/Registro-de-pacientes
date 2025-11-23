@@ -14,7 +14,6 @@ import sys, sqlite3, json, shutil
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
 from PyQt5.QtCore  import Qt, QTime, QDate, pyqtSignal, QTimer
 from PyQt5.QtGui   import QPixmap, QGuiApplication
 from PyQt5.QtWidgets import (
