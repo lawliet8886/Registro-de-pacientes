@@ -1,11 +1,12 @@
 """
 Registro de Pacientes – v3.5 😎
-==============================
-• Aba Desjejum 🥞 e dashboard atualizado  
-• Convívio (C) preenche e limpa refeições automaticamente  
-• Log de alterações de refeições, com ✏️ ao lado do nome  
-• Duplo-clique exibe histórico de refeições do paciente  
-• Reativar 🔄 remove duplicado da aba “Saíram”  
+
+Notas de release:
+• Aba Desjejum 🥞 e dashboard atualizado
+• Convívio (C) preenche e limpa refeições automaticamente
+• Log de alterações de refeições, com ✏️ ao lado do nome
+• Duplo-clique exibe histórico de refeições do paciente
+• Reativar 🔄 remove duplicado da aba “Saíram”
 • Compatível com bancos antigos (migração automática)
 
 Requisito único: PyQt5
