@@ -739,9 +739,15 @@ class Main(QMainWindow):
         self.tbl_cons_day   = self._cons_tbl("Consolidado (dia)")
         self.tbl_cons_total = self._cons_tbl("Consolidado (geral)")
 
+        self.patient_tables = [
+            self.tbl_all, self.tbl_break, self.tbl_lunch, self.tbl_snack,
+            self.tbl_dinner, self.tbl_acolh, self.tbl_left,
+        ]
+
         # ─── 7. Botões de ação ───────────────────────────────────────
         row_btn = QHBoxLayout(); outer.addLayout(row_btn)
-        row_btn.addWidget(QPushButton("Marcar saída 🚪", clicked=self.leave))
+        self.btn_leave = QPushButton("Marcar saída 🚪", clicked=self.leave)
+        row_btn.addWidget(self.btn_leave)
         row_btn.addWidget(QPushButton("Reativar 🔄",    clicked=self.activate))
         row_btn.addWidget(QPushButton("Editar refeições 🍽️", clicked=self.edit_meals))
         row_btn.addWidget(QPushButton("Pesquisar 🔍",  clicked=self.search))
@@ -756,6 +762,8 @@ class Main(QMainWindow):
 
 
 
+        self.tabs.currentChanged.connect(self._update_leave_button_state)
+        self._update_leave_button_state()
         row_btn.addStretch()
 
         # ─── 8. Primeira atualização ─────────────────────────────────
@@ -1679,9 +1687,17 @@ class Main(QMainWindow):
             QMessageBox.critical(self, "Erro ❌", str(e))
 
 
+    def _update_leave_button_state(self):
+        is_patient_tab = self.tabs.currentWidget() in self.patient_tables
+        self.btn_leave.setEnabled(is_patient_tab)
+
+
     # -------- saída
     def leave(self):
         tbl=self.tabs.currentWidget()
+        if tbl not in self.patient_tables:
+            QMessageBox.warning(self, "Aviso ⚠️", "Selecione uma aba de pacientes.")
+            return
         if tbl is self.tbl_left: return
         rows=tbl.selectionModel().selectedRows()
         if not rows: QMessageBox.warning(self,"Aviso ⚠️","Selecione o paciente."); return
