@@ -10,11 +10,11 @@ Registro de Pacientes – v3.5 😎
 
 Requisito único: PyQt5
 """
-import sys, sqlite3, json, shutil
+import sys, sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from PyQt5.QtCore  import Qt, QTime, QDate, pyqtSignal, QTimer
+from PyQt5.QtCore  import Qt, QTime, QDate, QTimer
 from PyQt5.QtGui   import QPixmap, QGuiApplication
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QMessageBox,
@@ -23,27 +23,14 @@ from PyQt5.QtWidgets import (
     QDateEdit, QTabWidget, QFileDialog, QProgressDialog, QInputDialog,
 )
 
-# ─────────────────────────────────────── Função de reparo rápida
-def _fix_old_imports(parent=None):
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE records
-               SET enter_sys = enter_inf
-             WHERE enter_inf GLOB '??:??'
-               AND (enter_sys IS NULL OR enter_sys <> enter_inf)
-        """)
-        n1 = cur.rowcount
-        cur.execute("""
-            UPDATE records
-               SET desjejum = 1
-             WHERE desjejum = 0
-               AND enter_inf LIKE '09:%'
-        """)
-        n2 = cur.rowcount
-        conn.commit()
-    QMessageBox.information(parent, "Reparo concluído",
-                            f"{n1} horários corrigidos\n{n2} desjejuns marcados")
+from infra import DB_PATH, backup_now, init_db, _fix_old_imports
+from ui.dialogs import (
+    EncaminhamentoDialog,
+    SearchDialog,
+    SimpleTimeDialog,
+    TimeIntervalDialog,
+)
+from ui.widgets import MyLineEdit
 
 # ─────────────────────────────────────── Constantes de horário
 HORARIOS = {
@@ -60,194 +47,8 @@ DEMAND_LIST = [
     "AI", "REA",
 ]
 
-DB_PATH = Path(__file__).with_name("patients.db")
-
-# ─────────────────────────────────────── Configurações (backup)
-CONFIG_FILE = Path(__file__).with_name("settings.json")
-
-def _load_cfg() -> dict:
-    if CONFIG_FILE.exists():
-        try:
-            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {}
-
-def _save_cfg(data: dict) -> None:
-    CONFIG_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-# ─────────────────────────────────────── Diretório de backup
-def get_backup_root(parent=None) -> Path | None:
-    """
-    Garante um diretório de backup gravável dentro do Google Drive.
-    Pergunta/ajusta até conseguir ou até o usuário cancelar.
-    """
-    cfg     = _load_cfg()
-    root    = Path(cfg.get("backup_root", r"G:\Meu Drive\backup_recepção"))
-    parcial = r"G:\Meu Drive"          # parte fixa (sem barra final)
-
-    while True:
-        try:
-            root.mkdir(parents=True, exist_ok=True)
-            tmp = root / "~write_test.tmp"
-            tmp.write_text("ok"); tmp.unlink()
-            return root                          # 👍  tudo certo
-        except Exception:
-            # Falhou → explica e pede correção
-            msg = (
-                "⚠️  Não consegui gravar o backup.\n\n"
-                "• O Google Drive está instalado e logado como "
-                "recepcaopauloportela@gmail.com?\n"
-                "• No Explorador de Arquivos, existe o disco “Google Drive (G:)”?\n\n"
-                "Agora informe (ou crie) a pasta onde os backups serão salvos.\n"
-                f"O início já está preenchido:  {parcial}\\"
-            )
-            sugestao = (
-                str(root).replace(parcial + "\\", "", 1)
-                if str(root).startswith(parcial) else ""
-            )
-            pasta, ok = QInputDialog.getText(
-                parent, "Corrigir pasta de backup", msg, text=sugestao
-            )
-            if not ok:               # usuário cancelou
-                return None
-            root = Path(parcial) / pasta.strip(" /\\")
-            cfg["backup_root"] = str(root)
-            _save_cfg(cfg)
-
-# ─────────────────────────────────────── Execução do backup
-def backup_now(parent=None) -> None:
-    """
-    Copia patients.db para:
-        <pasta-backup>\AAAA-MM\<DD>\patients_HH-MM-SS.db
-    """
-    root = get_backup_root(parent)
-    if root is None:                              # usuário desistiu
-        return
-
-    try:
-        now       = datetime.now()
-        month_dir = root / now.strftime("%Y-%m")
-        day_dir   = month_dir / now.strftime("%d")
-        day_dir.mkdir(parents=True, exist_ok=True)
-
-        dest = day_dir / f"patients_{now.strftime('%H-%M-%S')}.db"
-        shutil.copy2(DB_PATH, dest)
-
-        if parent:
-            QMessageBox.information(
-                parent, "Backup concluído ☁️",
-                f"Arquivo salvo em:\n{dest}"
-            )
-    except Exception as exc:
-        if parent:
-            QMessageBox.critical(parent, "Falha no backup", str(exc))
-        else:
-            raise
-
-
-
-class ClickLabel(QLabel):
-    clicked = pyqtSignal()
-
-    # dispara **uma** vez por clique (mouse solto) e não chama
-    # o handler original do Qt, evitando o duplo pop-up
-    def mouseReleaseEvent(self, ev):
-        self.clicked.emit()
-          # depois seu sinal
-
-# ───────────────────────────────────────────────────────────── Widgets
-class MyLineEdit(QLineEdit):
-    def keyPressEvent(self, e):
-        super().keyPressEvent(e)
-        if e.key() in (Qt.Key_Return, Qt.Key_Enter):
-            self.focusNextChild()
-
-class SimpleTimeDialog(QDialog):
-    def __init__(self, title, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        lay = QFormLayout(self)
-        self.t = QTimeEdit(displayFormat="HH:mm")
-        self.t.setTime(QTime.currentTime())
-        lay.addRow("Hora aproximada:", self.t)
-        lay.addRow("", QPushButton("Salvar ✅", clicked=self.accept))
-    def hour(self) -> str: return self.t.time().toString("HH:mm")
-
-class TimeIntervalDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Intervalo de Convivência 🕒")
-        lay = QFormLayout(self)
-        self.start = QTimeEdit(displayFormat="HH:mm"); self.end = QTimeEdit(displayFormat="HH:mm")
-        lay.addRow("Início:", self.start); lay.addRow("Fim:", self.end)
-        lay.addRow("", QPushButton("Salvar ✅", clicked=self.accept))
-    def interval(self): return (self.start.time().toString("HH:mm"), self.end.time().toString("HH:mm"))
-
-class EncaminhamentoDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent); self.setWindowTitle("Tipo de Encaminhamento 🤝")
-        lay = QFormLayout(self)
-        self.cmb = QComboBox(); self.cmb.addItems([
-            "Demanda Espontânea","Abordagem na Rua","Abrigo","Ambulatório",
-            "Atenção Básica","Caps da RAPS Municipal","Caps de outro Município","Comunidade Terapêutica",
-            "Conselho Tutelar","Consultório na Rua","CREAS/CRAS","Escola","Emergência Clínica"," Emergência Psiquiátrica", 
-            "Hospital Geral","Hospital Psiquiátrico","Justiça","Hospital Maternidade",
-            "Rede Intersetorial","Rede Privada Amb/Hospital"
-        ])
-        lay.addRow("Tipo:", self.cmb); lay.addRow("", QPushButton("Salvar ✅", clicked=self.accept))
-    def choice(self): return self.cmb.currentText()
 
 # ───────────────────────────────────────────────────────────── DB helpers
-def init_db():
-    with sqlite3.connect(DB_PATH) as c:
-        # tabela principal
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS records(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          patient_name TEXT, demands TEXT, reference_prof TEXT,
-          date TEXT,
-          enter_sys TEXT, enter_inf TEXT,
-          left_sys  TEXT, left_inf  TEXT,
-          observations TEXT, encaminhamento TEXT,
-          desjejum INTEGER DEFAULT 0, lunch INTEGER DEFAULT 0,
-          snack INTEGER DEFAULT 0, dinner INTEGER DEFAULT 0,
-          start_time TEXT, end_time TEXT
-        )
-        """)
-        # tabela de log
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS meal_log(
-          log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          record_id INTEGER, ts TEXT,
-          old_b INTEGER, old_l INTEGER, old_s INTEGER, old_d INTEGER,
-          new_b INTEGER, new_l INTEGER, new_s INTEGER, new_d INTEGER
-        )
-        """)
-
-                # log de mudanças de demandas
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS demand_log (
-          log_id      INTEGER PRIMARY KEY AUTOINCREMENT,
-          record_id   INTEGER,
-          ts          TEXT,
-          old_demands TEXT,
-          new_demands TEXT
-        )
-        """)
-
-        # migração de colunas faltantes
-        existing = [r[1] for r in c.execute("PRAGMA table_info(records)")]
-        for col in ["enter_sys","enter_inf","left_sys","left_inf","desjejum"]:
-            if col not in existing:
-                c.execute(f"ALTER TABLE records ADD COLUMN {col} "
-                          f"{'INTEGER DEFAULT 0' if col=='desjejum' else 'TEXT'}")
-        # migra coluna 'time' antiga
-        if "time" in existing and "enter_sys" in existing:
-            c.execute("UPDATE records SET enter_sys=time WHERE enter_sys IS NULL OR enter_sys=''")
-        c.commit()
-        if "archived_ai" not in existing:
-            c.execute("ALTER TABLE records ADD COLUMN archived_ai INTEGER DEFAULT 0")
         
 
 def add_record(row:dict):
