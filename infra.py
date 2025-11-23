@@ -90,8 +90,10 @@ def backup_now(parent=None) -> None:
             raise
 
 
-def init_db():
-    with sqlite3.connect(DB_PATH) as c:
+def init_db(db_path: Optional[Path] = None):
+    db_file = Path(db_path or DB_PATH)
+
+    with sqlite3.connect(db_file) as c:
         # tabela principal
         c.execute("""
         CREATE TABLE IF NOT EXISTS records(
