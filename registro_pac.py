@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
     QDateEdit, QTabWidget, QFileDialog, QProgressDialog, QInputDialog,
 )
 
-from infra import DB_PATH, backup_now, init_db, _fix_old_imports
+from infra import DB_PATH as DEFAULT_DB_PATH, backup_now, init_db as infra_init_db, _fix_old_imports
 from ui.dialogs import (
     EncaminhamentoDialog,
     SearchDialog,
@@ -50,6 +50,13 @@ DEMAND_LIST = [
 
 # ───────────────────────────────────────────────────────────── DB helpers
         
+
+DB_PATH = DEFAULT_DB_PATH
+
+
+def init_db():
+    infra_init_db(DB_PATH)
+
 
 def add_record(row:dict):
     cols=", ".join(row); qs=", ".join("?"*len(row))
