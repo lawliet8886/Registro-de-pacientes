@@ -362,8 +362,30 @@ def has_edit_log(pid):
 
 def leave_record(pid, left_sys, left_inf):
     with sqlite3.connect(DB_PATH) as c:
-        c.execute("UPDATE records SET left_sys=?,left_inf=? WHERE id=?",
-                  (left_sys,left_inf,pid)); c.commit()
+        row = c.execute(
+            "SELECT enter_inf,left_sys FROM records WHERE id=?",
+            (pid,),
+        ).fetchone()
+
+        if row is None:
+            raise RuntimeError("ID não encontrado.")
+
+        enter_inf, already_left = row
+
+        if already_left:
+            raise ValueError("Paciente já está na aba “Saíram”.")
+
+        enter_time = QTime.fromString(enter_inf, "HH:mm")
+        left_time  = QTime.fromString(left_inf,  "HH:mm")
+
+        if enter_time.isValid() and left_time.isValid() and left_time < enter_time:
+            raise ValueError("Horário de saída não pode ser anterior ao horário de entrada.")
+
+        c.execute(
+            "UPDATE records SET left_sys=?,left_inf=? WHERE id=?",
+            (left_sys, left_inf, pid),
+        )
+        c.commit()
 
 def reactivate_from(pid, enter_sys, enter_inf):
     with sqlite3.connect(DB_PATH) as c:
@@ -1705,7 +1727,13 @@ class Main(QMainWindow):
         if not dlg.exec_(): return
         left_inf=dlg.hour(); left_sys=QTime.currentTime().toString("HH:mm")
         for r in rows:
-            pid=int(tbl.item(r.row(),0).text()); leave_record(pid,left_sys,left_inf)
+            pid=int(tbl.item(r.row(),0).text())
+            try:
+                leave_record(pid,left_sys,left_inf)
+            except ValueError as exc:
+                QMessageBox.warning(self, "Aviso ⚠️", str(exc))
+            except Exception as exc:
+                QMessageBox.critical(self, "Erro ❌", str(exc))
         self.refresh()
 
     # -------- reativar
