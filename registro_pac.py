@@ -1687,7 +1687,7 @@ class Main(QMainWindow):
             QMessageBox.critical(self, "Erro ❌", str(e))
 
 
-    def _update_leave_button_state(self):
+    def _update_leave_button_state(self, index=None):
         is_patient_tab = self.tabs.currentWidget() in self.patient_tables
         self.btn_leave.setEnabled(is_patient_tab)
 
