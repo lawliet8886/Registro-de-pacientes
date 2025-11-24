@@ -112,6 +112,11 @@ def test_update_demands_validates_time_format(temp_db, sample_record):
         registro_pac.update_demands(sample_record, "C", new_start="25:00", new_end="26:00")
 
 
+def test_update_demands_rejects_end_before_start(temp_db, sample_record):
+    with pytest.raises(ValueError):
+        registro_pac.update_demands(sample_record, "C", new_start="12:00", new_end="10:00")
+
+
 def test_fetch_acolh_ignores_archived_clones(monkeypatch, temp_db, sample_record):
     pid = sample_record
 
