@@ -235,22 +235,24 @@ def leave_record(pid, left_sys, left_inf):
 
 def reactivate_from(pid, enter_sys, enter_inf):
     with get_conn() as c:
-        row=c.execute("""SELECT patient_name,demands,reference_prof,date,
-                             observations,encaminhamento,
-                             desjejum,lunch,snack,dinner,
-                             start_time,end_time FROM records WHERE id=?""",(pid,)).fetchone()
-        if not row: raise RuntimeError("ID não encontrado.")
-        (name,dmd,ref,date,obs,enc,b,l,s,d,st,en)=row
-        novo=dict(patient_name=name,demands=dmd,reference_prof=ref,date=date,
-                  enter_sys=enter_sys,enter_inf=enter_inf,
-                  left_sys=None,left_inf=None,
-                  observations=obs,encaminhamento=enc,
-                  desjejum=b,lunch=l,snack=s,dinner=d,
-                  start_time=st,end_time=en,
-                  archived_ai=0)
-        add_record(novo)
-        c.execute("DELETE FROM records WHERE id=?", (pid,))
+        row = c.execute("SELECT left_sys FROM records WHERE id=?", (pid,)).fetchone()
+        if row is None:
+            raise RuntimeError("ID não encontrado.")
+
+        left_sys, = row
+        if left_sys is None:
+            raise ValueError("Registro já está ativo; não é possível reativar duas vezes.")
+
+        c.execute(
+            """
+            UPDATE records
+               SET enter_sys=?, enter_inf=?, left_sys=NULL, left_inf=NULL, archived_ai=0
+             WHERE id=?
+            """,
+            (enter_sys, enter_inf, pid),
+        )
         c.commit()
+        return pid
 
 def has_meal_log(pid)->bool:
     with get_conn() as c:
