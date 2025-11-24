@@ -1955,10 +1955,12 @@ class Main(QMainWindow):
         # ——— puxa dados do BD ———
         with get_conn() as c:
             today_rows = c.execute(
-                "SELECT * FROM records WHERE date=? AND left_sys IS NULL",
+                "SELECT * FROM records WHERE date=? AND left_sys IS NULL AND archived_ai=0",
                 (iso,),
             ).fetchall()
-            all_rows   = c.execute("SELECT * FROM records").fetchall()
+            all_rows   = c.execute(
+                "SELECT * FROM records WHERE archived_ai=0"
+            ).fetchall()
 
         day = self._metrics(today_rows)
         tot = self._metrics(all_rows)
