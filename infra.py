@@ -1,4 +1,5 @@
 import json
+import logging
 import shutil
 import sqlite3
 from datetime import datetime
@@ -11,12 +12,36 @@ DB_PATH = Path(__file__).with_name("patients.db")
 CONFIG_FILE = Path(__file__).with_name("settings.json")
 
 
-def _load_cfg() -> dict:
+def _load_cfg(parent=None) -> dict:
     if CONFIG_FILE.exists():
         try:
             return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger = logging.getLogger(__name__)
+
+            broken_name = CONFIG_FILE.with_name(
+                f"{CONFIG_FILE.stem}.broken{CONFIG_FILE.suffix}"
+            )
+            try:
+                CONFIG_FILE.rename(broken_name)
+            except Exception as rename_exc:
+                logger.warning(
+                    "Falha ao renomear configuração corrompida: %s", rename_exc
+                )
+                broken_name = CONFIG_FILE
+
+            logger.error("Configuração inválida: %s", exc)
+
+            QMessageBox.warning(
+                parent,
+                "Configuração inválida",
+                (
+                    "⚠️  Não foi possível ler o arquivo de configuração.\n\n"
+                    f"Arquivo problemático: {CONFIG_FILE}\n"
+                    f"Renomeado para: {broken_name}\n\n"
+                    "As configurações serão reiniciadas."
+                ),
+            )
     return {}
 
 

@@ -11,7 +11,7 @@ import registro_pac
 
 def test_load_cfg_missing_file(tmp_path, monkeypatch):
     cfg_path = tmp_path / "settings.json"
-    monkeypatch.setattr(registro_pac, "CONFIG_FILE", cfg_path)
+    monkeypatch.setitem(registro_pac._load_cfg.__globals__, "CONFIG_FILE", cfg_path)
 
     assert registro_pac._load_cfg() == {}
 
@@ -19,14 +19,28 @@ def test_load_cfg_missing_file(tmp_path, monkeypatch):
 def test_load_cfg_invalid_json_returns_empty(tmp_path, monkeypatch):
     cfg_path = tmp_path / "settings.json"
     cfg_path.write_text("not-json", encoding="utf-8")
-    monkeypatch.setattr(registro_pac, "CONFIG_FILE", cfg_path)
+    monkeypatch.setitem(registro_pac._load_cfg.__globals__, "CONFIG_FILE", cfg_path)
+
+    class DummyMessageBox:
+        warnings = []
+
+        @classmethod
+        def warning(cls, parent, title, text):
+            cls.warnings.append((title, text))
+
+    monkeypatch.setitem(
+        registro_pac._load_cfg.__globals__, "QMessageBox", DummyMessageBox
+    )
 
     assert registro_pac._load_cfg() == {}
+    assert not cfg_path.exists()
+    assert (tmp_path / "settings.broken.json").exists()
+    assert DummyMessageBox.warnings
 
 
 def test_save_cfg_writes_pretty_json(tmp_path, monkeypatch):
     cfg_path = tmp_path / "settings.json"
-    monkeypatch.setattr(registro_pac, "CONFIG_FILE", cfg_path)
+    monkeypatch.setitem(registro_pac._save_cfg.__globals__, "CONFIG_FILE", cfg_path)
 
     data = {"backup_root": "example"}
     registro_pac._save_cfg(data)
@@ -39,7 +53,7 @@ def test_save_cfg_writes_pretty_json(tmp_path, monkeypatch):
 def test_backup_now_creates_timestamped_copy(tmp_path, monkeypatch):
     source_db = tmp_path / "patients.db"
     source_db.write_text("database-contents", encoding="utf-8")
-    monkeypatch.setattr(registro_pac, "DB_PATH", source_db)
+    monkeypatch.setitem(registro_pac.backup_now.__globals__, "DB_PATH", source_db)
 
     backup_root = tmp_path / "backup"
     monkeypatch.setattr(registro_pac, "get_backup_root", lambda parent=None: backup_root)
