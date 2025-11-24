@@ -863,6 +863,7 @@ class Main(QMainWindow):
                        enter_inf
                   FROM records
                  WHERE date=? AND {col_name}=1 AND left_sys IS NULL
+                   AND archived_ai = 0
                  ORDER BY patient_name
             """, (date_iso,)).fetchall()
 
