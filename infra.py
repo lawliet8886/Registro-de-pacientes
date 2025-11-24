@@ -51,6 +51,7 @@ def _save_cfg(data: dict) -> None:
 
 def get_backup_root(parent=None) -> Optional[Path]:
     """Retorna um diretório de backup gravável dentro do Google Drive."""
+    logger = logging.getLogger(__name__)
     cfg = _load_cfg()
     root = Path(cfg.get("backup_root", r"G:\\Meu Drive\\backup_recepção"))
     parcial = r"G:\\Meu Drive"          # parte fixa (sem barra final)
@@ -62,9 +63,12 @@ def get_backup_root(parent=None) -> Optional[Path]:
             tmp.write_text("ok")
             tmp.unlink()
             return root                          # 👍  tudo certo
-        except Exception:
+        except (OSError, PermissionError) as exc:
+            logger.warning(
+                "Falha de acesso ao diretório de backup %s: %s", root, exc
+            )
             msg = (
-                "⚠️  Não consegui gravar o backup.\n\n"
+                f"⚠️  Não consegui gravar o backup ({exc}).\n\n"
                 "• O Google Drive está instalado e logado como "
                 "recepcaopauloportela@gmail.com?\n"
                 "• No Explorador de Arquivos, existe o disco “Google Drive (G:)”?\n\n"
@@ -83,6 +87,11 @@ def get_backup_root(parent=None) -> Optional[Path]:
             root = Path(parcial) / pasta.strip(" /\\")
             cfg["backup_root"] = str(root)
             _save_cfg(cfg)
+        except Exception as exc:
+            logger.exception(
+                "Erro inesperado ao configurar diretório de backup: %s", root
+            )
+            raise
 
 
 def backup_now(parent=None, now: Optional[datetime] = None) -> None:
