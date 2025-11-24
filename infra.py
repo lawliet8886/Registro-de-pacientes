@@ -183,6 +183,11 @@ def init_db():
         if "archived_ai" not in existing:
             c.execute("ALTER TABLE records ADD COLUMN archived_ai INTEGER DEFAULT 0")
 
+        # diagnóstico de comorbidades (HAS/DM)
+        for col in ("diag_has", "diag_dm"):
+            if col not in existing:
+                c.execute(f"ALTER TABLE records ADD COLUMN {col} INTEGER DEFAULT 0")
+
 
 def _fix_old_imports(parent=None):
     with get_conn() as conn:

@@ -114,6 +114,10 @@ class SearchDialog(QDialog):
         self.chk_adv = QCheckBox("Busca avançada (tokenizar nome/prof.)")
         lay.addRow(self.chk_adv)
 
+        # —— filtro de usuários ativos ———————————————————————
+        self.chk_active = QCheckBox("Somente usuários ativos (sem saída registrada)")
+        lay.addRow(self.chk_active)
+
         lay.addRow("", QPushButton("Buscar ✅", clicked=self.accept))
 
         # primeira carga das listas
@@ -187,4 +191,5 @@ class SearchDialog(QDialog):
             s=self.chk_s.isChecked(),
             d=self.chk_d.isChecked(),
             adv=self.chk_adv.isChecked(),
+            active_only=self.chk_active.isChecked(),
         )
