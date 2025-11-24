@@ -265,7 +265,7 @@ def counts(date_iso):
         SELECT SUM(desjejum),SUM(lunch),SUM(snack),SUM(dinner),
                COUNT(*),
                SUM(CASE WHEN encaminhamento IS NOT NULL THEN 1 ELSE 0 END)
-        FROM records WHERE date=? AND left_sys IS NULL""",(date_iso,)).fetchone()
+        FROM records WHERE date=? AND left_sys IS NULL AND archived_ai=0""",(date_iso,)).fetchone()
     return {"desj":dj or 0,"lunch":al or 0,"snack":la or 0,
             "dinner":ja or 0,"total de Pacientes":total or 0,"acolh":acolh or 0}
 
@@ -753,7 +753,9 @@ class Main(QMainWindow):
         data.update({c: 0 for c in codes})
 
         for r in rows:
-            data["total de Pacientes"] += 1
+            is_clone = bool(r[17])
+            if not is_clone:
+                data["total de Pacientes"] += 1
 
             # ----- DEMANDAS --------------------------------------------------
             dmd_tokens = [s.strip() for s in (r[2] or "").split(",")]
@@ -766,7 +768,6 @@ class Main(QMainWindow):
 
             # ----- REFEIÇÕES (ignora clones AI) --------------------
             # 3) _metrics()
-            is_clone = bool(r[17])       # 17 = archived_ai
             if not is_clone:             # clones não contam refeições
                 if r[11]: data["desj"] += r[11]
                 if r[12]: data["alm"]  += r[12]
@@ -1949,6 +1950,7 @@ class Main(QMainWindow):
 
         day = self._metrics(today_rows)
         tot = self._metrics(all_rows)
+        counts_today = counts(iso)
 
         # --- mini-contadores do dashboard ---
         mini = {
@@ -1956,8 +1958,8 @@ class Main(QMainWindow):
             "lunch": day["alm"],
             "snack": day["lan"],
             "dinner":day["jan"],
-            "total": day["total de Pacientes"],
-            "acolh": day["acolh"],
+            "total": counts_today["total de Pacientes"],
+            "acolh": counts_today["acolh"],
         }
         for k, v in mini.items():
             lbl = self.dash_lbls.get(k)        # ← evita KeyError se faltar

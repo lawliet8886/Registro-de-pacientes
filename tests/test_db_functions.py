@@ -184,3 +184,57 @@ def test_counts_ignores_left_records(temp_db):
         "total de Pacientes": 1,
         "acolh": 1,
     }
+
+
+def test_counts_ignores_archived_ai(temp_db):
+    registro_pac.add_record(
+        {
+            "patient_name": "Ativo",
+            "demands": "A",
+            "reference_prof": "Prof",
+            "date": "2024-03-03",
+            "enter_sys": "08:00",
+            "enter_inf": "08:00",
+            "left_sys": None,
+            "left_inf": None,
+            "observations": "",
+            "encaminhamento": None,
+            "desjejum": 1,
+            "lunch": 0,
+            "snack": 0,
+            "dinner": 0,
+            "start_time": None,
+            "end_time": None,
+            "archived_ai": 0,
+        }
+    )
+    registro_pac.add_record(
+        {
+            "patient_name": "Clone",
+            "demands": "AI",
+            "reference_prof": "Prof",
+            "date": "2024-03-03",
+            "enter_sys": "09:00",
+            "enter_inf": "09:00",
+            "left_sys": None,
+            "left_inf": None,
+            "observations": "",
+            "encaminhamento": None,
+            "desjejum": 0,
+            "lunch": 0,
+            "snack": 0,
+            "dinner": 0,
+            "start_time": None,
+            "end_time": None,
+            "archived_ai": 1,
+        }
+    )
+
+    assert registro_pac.counts("2024-03-03") == {
+        "desj": 1,
+        "lunch": 0,
+        "snack": 0,
+        "dinner": 0,
+        "total de Pacientes": 1,
+        "acolh": 0,
+    }
