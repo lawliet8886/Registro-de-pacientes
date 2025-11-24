@@ -12,6 +12,13 @@ DB_PATH = Path(__file__).with_name("patients.db")
 CONFIG_FILE = Path(__file__).with_name("settings.json")
 
 
+def get_conn(timeout: int = 30) -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH, timeout=timeout)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=?", (int(timeout * 1000),))
+    return conn
+
+
 def _load_cfg(parent=None) -> dict:
     if CONFIG_FILE.exists():
         try:
@@ -125,7 +132,7 @@ def backup_now(parent=None, now: Optional[datetime] = None) -> None:
 
 
 def init_db():
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         # tabela principal
         c.execute("""
         CREATE TABLE IF NOT EXISTS records(
@@ -178,7 +185,7 @@ def init_db():
 
 
 def _fix_old_imports(parent=None):
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_conn() as conn:
         cur = conn.cursor()
         cur.execute("""
             UPDATE records

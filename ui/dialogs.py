@@ -1,5 +1,3 @@
-import sqlite3
-
 from PyQt5.QtCore import QDate
 from PyQt5.QtWidgets import (
     QCheckBox,
@@ -11,7 +9,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
 )
 
-from infra import DB_PATH
+from infra import get_conn
 
 
 class SimpleTimeDialog(QDialog):
@@ -135,7 +133,7 @@ class SearchDialog(QDialog):
         self.cmb_dmd.addItem("— Qualquer —", "")
 
         seen = set()
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             for (demands,) in c.execute(
                 """
                  SELECT DISTINCT demands FROM records
@@ -159,7 +157,7 @@ class SearchDialog(QDialog):
         self.cmb_enc.blockSignals(True)
         self.cmb_enc.clear()
         self.cmb_enc.addItem("— Qualquer —", "")
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             encs = [
                 e
                 for (e,) in c.execute(

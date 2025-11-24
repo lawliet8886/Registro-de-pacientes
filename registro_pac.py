@@ -10,7 +10,7 @@ Registro de Pacientes – v3.5 😎
 
 Requisito único: PyQt5
 """
-import sys, sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -25,10 +25,10 @@ from PyQt5.QtWidgets import (
 
 from infra import (
     CONFIG_FILE,
-    DB_PATH,
     _load_cfg,
     _save_cfg,
     backup_now,
+    get_conn,
     init_db,
     _fix_old_imports,
 )
@@ -80,12 +80,12 @@ def add_record(row: dict):
     cols = ", ".join(EXPECTED_COLS)
     qs = ", ".join("?" * len(EXPECTED_COLS))
     values = tuple(row[c] for c in EXPECTED_COLS)
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         c.execute(f"INSERT INTO records ({cols}) VALUES ({qs})", values)
         c.commit()
 
 def update_meals(pid, new_b, new_l, new_s, new_d):
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         row = c.execute(
             "SELECT desjejum,lunch,snack,dinner FROM records WHERE id=?",
             (pid,)
@@ -142,7 +142,7 @@ def update_demands(pid, new_demands, new_start=None, new_end=None, new_enc=None)
         if not (start_qt.isValid() and end_qt.isValid()):
             raise ValueError("Horário inválido; use o formato HH:mm.")
 
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         cur = c.cursor()
         row = cur.execute(
             "SELECT demands,start_time,end_time,encaminhamento,"
@@ -198,7 +198,7 @@ def update_demands(pid, new_demands, new_start=None, new_end=None, new_enc=None)
         c.commit()
         
 def has_edit_log(pid):
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         return (
             c.execute("SELECT 1 FROM meal_log   WHERE record_id=? LIMIT 1", (pid,)).fetchone()
             or c.execute("SELECT 1 FROM demand_log WHERE record_id=? LIMIT 1", (pid,)).fetchone()
@@ -207,7 +207,7 @@ def has_edit_log(pid):
 
 
 def leave_record(pid, left_sys, left_inf):
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         row = c.execute(
             "SELECT enter_inf,left_sys FROM records WHERE id=?",
             (pid,),
@@ -234,7 +234,7 @@ def leave_record(pid, left_sys, left_inf):
         c.commit()
 
 def reactivate_from(pid, enter_sys, enter_inf):
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         row=c.execute("""SELECT patient_name,demands,reference_prof,date,
                              observations,encaminhamento,
                              desjejum,lunch,snack,dinner,
@@ -253,14 +253,14 @@ def reactivate_from(pid, enter_sys, enter_inf):
         c.commit()
 
 def has_meal_log(pid)->bool:
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         return c.execute("SELECT 1 FROM meal_log WHERE record_id=? LIMIT 1",(pid,)).fetchone() is not None
 
 
 
 
 def counts(date_iso):
-    with sqlite3.connect(DB_PATH) as c:
+    with get_conn() as c:
         dj,al,la,ja,total,acolh=c.execute("""
         SELECT SUM(desjejum),SUM(lunch),SUM(snack),SUM(dinner),
                COUNT(*),
@@ -337,7 +337,7 @@ class SearchDialog(QDialog):
         self.cmb_dmd.addItem("— Qualquer —", "")
 
         seen = set()
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             for (demands,) in c.execute("""
                  SELECT DISTINCT demands FROM records
                   WHERE (substr(date,7,4)||substr(date,4,2)||substr(date,1,2))
@@ -359,7 +359,7 @@ class SearchDialog(QDialog):
         self.cmb_enc.blockSignals(True)
         self.cmb_enc.clear()
         self.cmb_enc.addItem("— Qualquer —", "")
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             encs = [e for (e,) in c.execute("""
                     SELECT DISTINCT encaminhamento FROM records
                      WHERE encaminhamento IS NOT NULL
@@ -804,7 +804,7 @@ class Main(QMainWindow):
         date_iso = self.date.date().toString("dd/MM/yyyy")
 
         # buscamos também demands, start_time e end_time
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             rows = c.execute(f"""
                 SELECT patient_name,
                        demands, start_time, end_time,
@@ -925,7 +925,7 @@ class Main(QMainWindow):
 
         # ---------- executa ----------
         sql += " ORDER BY (substr(date,7,4)||substr(date,4,2)||substr(date,1,2)) DESC, patient_name"
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             rows = c.execute(sql, params).fetchall()
 
         if not rows:
@@ -1071,7 +1071,7 @@ class Main(QMainWindow):
 
             ORDER BY id DESC
         """
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             return c.execute(sql, (date_iso,)).fetchall()
 
 # ------------------------------------------------------------
@@ -1089,7 +1089,7 @@ class Main(QMainWindow):
         prev_iso = QDate.fromString(today_iso, "dd/MM/yyyy")\
                          .addDays(-1).toString("dd/MM/yyyy")
 
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             rows = c.execute("""
                 SELECT patient_name, demands, reference_prof,
                        observations, encaminhamento,
@@ -1178,7 +1178,7 @@ class Main(QMainWindow):
 
         processed = 0
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = get_conn()
             cur  = conn.cursor()
             cur.execute("BEGIN")           # transação ÚNICA
 
@@ -1307,7 +1307,7 @@ class Main(QMainWindow):
         own_conn = False
         if cur is None:
             own_conn = True
-            conn = sqlite3.connect(DB_PATH)
+            conn = get_conn()
             cur  = conn.cursor()
 
         row = cur.execute(
@@ -1376,7 +1376,7 @@ class Main(QMainWindow):
         sql = f"{base_sql} {order_clause}"
 
         # ---------------- executa SQL ----------------------
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             rows = c.execute(sql, params).fetchall()
 
             # ---------------- filtro exato em Python -----------
@@ -1617,7 +1617,7 @@ class Main(QMainWindow):
 
         pid = int(tbl.item(rows[0].row(), 0).text())
 
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             row = c.execute(
                 "SELECT desjejum,lunch,snack,dinner FROM records WHERE id=?",
                 (pid,)
@@ -1664,7 +1664,7 @@ class Main(QMainWindow):
         pid = int(tbl.item(sel[0].row(), 0).text())
 
         # --------------- carrega dados atuais ---------------
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             row = c.execute("""
                 SELECT patient_name, demands, reference_prof, observations,
                        start_time, end_time, encaminhamento,
@@ -1839,7 +1839,7 @@ class Main(QMainWindow):
         try:
             update_demands(pid, new_demands, start_t, end_t, enc)
 
-            with sqlite3.connect(DB_PATH) as c:
+            with get_conn() as c:
                 c.execute("""
                     UPDATE records SET patient_name=?, reference_prof=?, observations=?
                     WHERE id=?""", (new_name, new_prof, new_obs, pid))
@@ -1863,7 +1863,7 @@ class Main(QMainWindow):
     # ------------------------------------------------------------
     def _show_observations(self):
         iso = self.date.date().toString("dd/MM/yyyy")
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             rows = c.execute("""
                 SELECT id, patient_name, observations
                 FROM records
@@ -1902,7 +1902,7 @@ class Main(QMainWindow):
     # -------- histórico (duplo clique)
     def show_history(self, item):
         pid = int(item.tableWidget().item(item.row(), 0).text())
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             meal = c.execute(
                 "SELECT ts,old_b,old_l,old_s,old_d,new_b,new_l,new_s,new_d "
                 "FROM meal_log WHERE record_id=? ORDER BY log_id",
@@ -1941,7 +1941,7 @@ class Main(QMainWindow):
 
 
         # ——— puxa dados do BD ———
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             today_rows = c.execute(
                 "SELECT * FROM records WHERE date=? AND left_sys IS NULL",
                 (iso,),
@@ -2000,7 +2000,7 @@ class Main(QMainWindow):
         iso  = self.date.date().toString("dd/MM/yyyy")
         seen = set()
 
-        with sqlite3.connect(DB_PATH) as c:
+        with get_conn() as c:
             for (demands,) in c.execute(
                 "SELECT DISTINCT demands FROM records "
                 "WHERE date=? AND demands IS NOT NULL", (iso,)
