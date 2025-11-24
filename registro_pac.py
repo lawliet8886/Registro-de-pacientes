@@ -1941,7 +1941,10 @@ class Main(QMainWindow):
 
         # ——— puxa dados do BD ———
         with sqlite3.connect(DB_PATH) as c:
-            today_rows = c.execute("SELECT * FROM records WHERE date=?", (iso,)).fetchall()
+            today_rows = c.execute(
+                "SELECT * FROM records WHERE date=? AND left_sys IS NULL",
+                (iso,),
+            ).fetchall()
             all_rows   = c.execute("SELECT * FROM records").fetchall()
 
         day = self._metrics(today_rows)
