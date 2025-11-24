@@ -134,13 +134,22 @@ def update_demands(pid, new_demands, new_start=None, new_end=None, new_enc=None)
       refeições zeradas, para fins de estatística.
     """
     if (new_start is None) != (new_end is None):
-        raise ValueError("new_start e new_end precisam ser fornecidos em conjunto.")
+        raise ValueError(
+            "new_start e new_end precisam ser fornecidos em conjunto; "
+            "corrija o intervalo antes de salvar."
+        )
 
     if new_start is not None:
         start_qt = QTime.fromString(new_start, "HH:mm")
         end_qt   = QTime.fromString(new_end,   "HH:mm")
         if not (start_qt.isValid() and end_qt.isValid()):
-            raise ValueError("Horário inválido; use o formato HH:mm.")
+            raise ValueError(
+                "Horário inválido; use o formato HH:mm e corrija o intervalo antes de salvar."
+            )
+        if end_qt < start_qt:
+            raise ValueError(
+                "Horário final não pode anteceder o inicial; ajuste o intervalo antes de salvar."
+            )
 
     with get_conn() as c:
         cur = c.cursor()
