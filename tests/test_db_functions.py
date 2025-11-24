@@ -112,6 +112,37 @@ def test_update_demands_validates_time_format(temp_db, sample_record):
         registro_pac.update_demands(sample_record, "C", new_start="25:00", new_end="26:00")
 
 
+def test_fetch_acolh_ignores_archived_clones(monkeypatch, temp_db, sample_record):
+    pid = sample_record
+
+    with sqlite3.connect(temp_db) as c:
+        c.execute(
+            "UPDATE records SET encaminhamento=? WHERE id=?",
+            ("EncOriginal", pid),
+        )
+        c.commit()
+
+    monkeypatch.setattr(
+        registro_pac.QTime,
+        "currentTime",
+        staticmethod(lambda: registro_pac.QTime.fromString("10:00", "HH:mm")),
+    )
+
+    registro_pac.update_demands(
+        pid,
+        "C",
+        new_start="11:00",
+        new_end="12:00",
+        new_enc="EncAtualizada",
+    )
+
+    dummy = type("Dummy", (), {})()
+    acolh = registro_pac.Main._fetch_acolh(dummy, "2024-01-01")
+
+    assert [row[0] for row in acolh] == [pid]
+    assert all(row[5] == 0 for row in acolh)
+
+
 def test_leave_record_validates_time_and_updates(temp_db, sample_record):
     pid = sample_record
 
