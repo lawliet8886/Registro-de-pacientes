@@ -670,8 +670,6 @@ class Main(QMainWindow):
         row_btn.addWidget(QPushButton("Reativar 🔄",    clicked=self.activate))
         row_btn.addWidget(QPushButton("Editar refeições 🍽️", clicked=self.edit_meals))
         row_btn.addWidget(QPushButton("Pesquisar 🔍",  clicked=self.search))
-        row_btn.addWidget(QPushButton("Relatório HAS/DM 📊",
-                                      clicked=self.comorbidity_report))
         row_btn.addWidget(QPushButton("Importar Excel 📥", clicked=self.import_excel))
         row_btn.addWidget(QPushButton("⚙️ Reparar dados antigos", clicked=self._run_fix))
         row_btn.addWidget(QPushButton("Editar registro 📝",  clicked=self.edit_record))
@@ -926,8 +924,7 @@ class Main(QMainWindow):
         """Converte dd/MM/yyyy em yyyymmdd para filtros SQL."""
         return d[6:10] + d[3:5] + d[0:2]
 
-    def _query_by_filters(self, f: dict, *, include_diag: bool = False,
-                          include_archived: bool = True):
+    def _query_by_filters(self, f: dict, *, include_archived: bool = True):
         """Monta e executa a query de busca, compartilhada por relatórios."""
 
         select_cols = [
@@ -935,8 +932,6 @@ class Main(QMainWindow):
             "desjejum", "lunch", "snack", "dinner",
             "enter_sys", "left_sys",
         ]
-        if include_diag:
-            select_cols.extend(["diag_has", "diag_dm"])
 
         sql = f"""
             SELECT {', '.join(select_cols)}
@@ -1063,123 +1058,6 @@ class Main(QMainWindow):
 
         res.resize(800, 460)
         res.exec_()
-
-    def comorbidity_report(self):
-        """Relatório de prevalência de HAS/DM em usuários ativos."""
-        dlg = SearchDialog(self)
-        dlg.setWindowTitle("Comorbidades HAS/DM 🔎")
-        dlg.chk_active.setChecked(True)
-        if dlg.exec_() == 0:
-            return
-
-        f = dlg.filters()
-        f["active_only"] = True   # força considerar somente ativos
-
-        rows = self._query_by_filters(
-            f, include_diag=True, include_archived=False
-        )
-
-        if not rows:
-            QMessageBox.information(
-                self,
-                "Comorbidades",
-                "Nenhum usuário ativo com os filtros informados.",
-            )
-            return
-
-        patients = {}
-        for row in rows:
-            name = row[1]
-            diag_has, diag_dm = bool(row[-2]), bool(row[-1])
-            info = patients.setdefault(name, {"has": False, "dm": False})
-            info["has"] = info["has"] or diag_has
-            info["dm"] = info["dm"] or diag_dm
-
-        total_actives = len(patients)
-        has_count = sum(1 for p in patients.values() if p["has"])
-        dm_count = sum(1 for p in patients.values() if p["dm"])
-
-        def _pct(count):
-            return 0 if total_actives == 0 else round((count / total_actives) * 100, 1)
-
-        metas = {"HAS": 27, "DM": 8}
-        prevalences = {
-            "HAS": {"count": has_count, "pct": _pct(has_count)},
-            "DM": {"count": dm_count, "pct": _pct(dm_count)},
-        }
-
-        res = QDialog(self)
-        res.setWindowTitle(
-            f"HAS/DM — ativos: {total_actives} | período {f['d_ini']} → {f['d_end']}"
-        )
-
-        headers = [
-            "Condição",
-            "Usuários com diagnóstico",
-            "Usuários ativos considerados",
-            "Prevalência",
-            "Meta mínima",
-            "Status",
-        ]
-
-        def status_row(label, key):
-            meta = metas[key]
-            pct = prevalences[key]["pct"]
-            atingida = pct >= meta
-            return [
-                label,
-                prevalences[key]["count"],
-                total_actives,
-                f"{pct:.1f}%",
-                f"{meta}%",
-                "✅ Meta atingida" if atingida else "⚠️ Abaixo da meta",
-            ]
-
-        rows_tbl = [
-            status_row("Hipertensão Arterial Sistêmica (HAS)", "HAS"),
-            status_row("Diabetes Mellitus (DM)", "DM"),
-        ]
-
-        tbl = QTableWidget(len(rows_tbl), len(headers), res)
-        tbl.setHorizontalHeaderLabels(headers)
-        for r, row in enumerate(rows_tbl):
-            for c, val in enumerate(row):
-                tbl.setItem(r, c, QTableWidgetItem(str(val)))
-        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        info_txt = (
-            "Prevalência calculada apenas entre usuários ativos (sem saída) "
-            "no período selecionado, considerando diagnósticos cadastrados/"
-            "atribuídos. Metas mínimas: 27% para HAS e 8% para DM."
-        )
-        lbl_info = QLabel(info_txt)
-        lbl_info.setWordWrap(True)
-
-        def _export():
-            if not _pandas_ready(self):
-                return
-            df = pd.DataFrame(rows_tbl, columns=headers)
-            nome = f"relatorio_comorb_{self._to_iso(f['d_ini'])}_{self._to_iso(f['d_end'])}.xlsx"
-            caminho = Path(__file__).with_name(nome)
-            try:
-                df.to_excel(caminho, index=False)
-                QMessageBox.information(
-                    res, "Exportado", f"Arquivo salvo em\n{caminho.name}"
-                )
-            except Exception as exc:
-                QMessageBox.critical(res, "Erro ao exportar", str(exc))
-
-        btn_exp = QPushButton("Exportar para Excel 📤", clicked=_export)
-
-        lay = QVBoxLayout(res)
-        lay.addWidget(tbl)
-        lay.addWidget(lbl_info)
-        lay.addWidget(btn_exp, alignment=Qt.AlignRight)
-
-        res.resize(900, 320)
-        res.exec_()
-
-
 
 
     # -------- tabela helper
