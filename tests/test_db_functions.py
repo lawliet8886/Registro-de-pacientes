@@ -132,6 +132,38 @@ def test_leave_record_validates_time_and_updates(temp_db, sample_record):
         registro_pac.leave_record(pid, left_sys="10:00", left_inf="10:00")
 
 
+def test_reactivate_from_updates_in_place(temp_db, sample_record):
+    pid = sample_record
+
+    registro_pac.update_meals(pid, 1, 1, 0, 0)
+    registro_pac.leave_record(pid, left_sys="09:00", left_inf="09:00")
+
+    with sqlite3.connect(temp_db) as c:
+        c.execute("UPDATE records SET archived_ai=1 WHERE id=?", (pid,))
+        c.commit()
+
+    returned_id = registro_pac.reactivate_from(pid, enter_sys="10:00", enter_inf="10:00")
+
+    with sqlite3.connect(temp_db) as c:
+        record = c.execute(
+            "SELECT id,enter_sys,enter_inf,left_sys,left_inf,archived_ai FROM records WHERE id=?",
+            (pid,),
+        ).fetchone()
+        assert record == (pid, "10:00", "10:00", None, None, 0)
+
+        assert c.execute("SELECT COUNT(*) FROM records").fetchone()[0] == 1
+
+        meal_logs = c.execute("SELECT record_id FROM meal_log").fetchall()
+        assert meal_logs == [(pid,)]
+
+    assert returned_id == pid
+
+
+def test_reactivate_from_validates_active_records(temp_db, sample_record):
+    with pytest.raises(ValueError):
+        registro_pac.reactivate_from(sample_record, enter_sys="08:30", enter_inf="08:30")
+
+
 def test_counts_ignores_left_records(temp_db):
     registro_pac.add_record(
         {
