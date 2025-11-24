@@ -57,12 +57,31 @@ DEMAND_LIST = [
 
 
 # ───────────────────────────────────────────────────────────── DB helpers
-        
 
-def add_record(row:dict):
-    cols=", ".join(row); qs=", ".join("?"*len(row))
+EXPECTED_COLS = [
+    "patient_name", "demands", "reference_prof", "date",
+    "enter_sys", "enter_inf", "left_sys", "left_inf",
+    "observations", "encaminhamento",
+    "desjejum", "lunch", "snack", "dinner",
+    "start_time", "end_time", "archived_ai",
+]
+
+
+def add_record(row: dict):
+    missing = [c for c in EXPECTED_COLS if c not in row]
+    extra = [c for c in row if c not in EXPECTED_COLS]
+    if missing or extra:
+        raise ValueError(
+            "Campos inválidos:" +
+            (f" faltando {', '.join(missing)}" if missing else "") +
+            (f"; extras {', '.join(extra)}" if extra else "")
+        )
+
+    cols = ", ".join(EXPECTED_COLS)
+    qs = ", ".join("?" * len(EXPECTED_COLS))
+    values = tuple(row[c] for c in EXPECTED_COLS)
     with sqlite3.connect(DB_PATH) as c:
-        c.execute(f"INSERT INTO records ({cols}) VALUES ({qs})", tuple(row.values()))
+        c.execute(f"INSERT INTO records ({cols}) VALUES ({qs})", values)
         c.commit()
 
 def update_meals(pid, new_b, new_l, new_s, new_d):
@@ -208,7 +227,8 @@ def reactivate_from(pid, enter_sys, enter_inf):
                   left_sys=None,left_inf=None,
                   observations=obs,encaminhamento=enc,
                   desjejum=b,lunch=l,snack=s,dinner=d,
-                  start_time=st,end_time=en)
+                  start_time=st,end_time=en,
+                  archived_ai=0)
         add_record(novo)
         c.execute("DELETE FROM records WHERE id=?", (pid,))
         c.commit()
@@ -1506,6 +1526,7 @@ class Main(QMainWindow):
                 dinner   = int(self.chk_d.isChecked()),
                 start_time = self.start_time,
                 end_time   = self.end_time,
+                archived_ai = 0,
             )
 
             add_record(row)

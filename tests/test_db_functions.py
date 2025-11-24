@@ -35,6 +35,7 @@ def sample_record(temp_db):
             "dinner": 0,
             "start_time": "09:00",
             "end_time": "10:00",
+            "archived_ai": 0,
         }
     )
     with sqlite3.connect(temp_db) as c:
@@ -137,6 +138,7 @@ def test_counts_ignores_left_records(temp_db):
             "dinner": 1,
             "start_time": None,
             "end_time": None,
+            "archived_ai": 0,
         }
     )
     registro_pac.add_record(
@@ -157,6 +159,7 @@ def test_counts_ignores_left_records(temp_db):
             "dinner": 0,
             "start_time": None,
             "end_time": None,
+            "archived_ai": 0,
         }
     )
 
