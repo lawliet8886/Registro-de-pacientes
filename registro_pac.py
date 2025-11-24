@@ -86,10 +86,15 @@ def add_record(row: dict):
 
 def update_meals(pid, new_b, new_l, new_s, new_d):
     with sqlite3.connect(DB_PATH) as c:
-        old_b, old_l, old_s, old_d = c.execute(
+        row = c.execute(
             "SELECT desjejum,lunch,snack,dinner FROM records WHERE id=?",
             (pid,)
         ).fetchone()
+
+        if row is None:
+            raise RuntimeError("ID não encontrado.")
+
+        old_b, old_l, old_s, old_d = row
 
         if (old_b, old_l, old_s, old_d) == (new_b, new_l, new_s, new_d):
             return  # nada mudou
@@ -130,11 +135,16 @@ def update_demands(pid, new_demands, new_start=None, new_end=None, new_enc=None)
     """
     with sqlite3.connect(DB_PATH) as c:
         cur = c.cursor()
-        (old_dem, old_start, old_end, old_enc, old_vals) = cur.execute(
+        row = cur.execute(
             "SELECT demands,start_time,end_time,encaminhamento,"
             "       desjejum||','||lunch||','||snack||','||dinner "
             "FROM records WHERE id=?", (pid,)
         ).fetchone()
+
+        if row is None:
+            raise RuntimeError("ID não encontrado.")
+
+        (old_dem, old_start, old_end, old_enc, old_vals) = row
 
         # ---------- 1) eventualmente cria o clone ------------------
         old_tokens = [t.strip() for t in (old_dem or "").split(",") if t.strip()]
@@ -1185,7 +1195,11 @@ class Main(QMainWindow):
                         pid = self._get_or_create(nome, data, cur)
 
                         # fetch dados atuais
-                        old_demands, = cur.execute("SELECT demands FROM records WHERE id=?", (pid,)).fetchone()
+                        row = cur.execute("SELECT demands FROM records WHERE id=?", (pid,)).fetchone()
+                        if row is None:
+                            raise RuntimeError("ID não encontrado.")
+
+                        old_demands, = row
                         old_demands = old_demands or ""
                         new_demands = ", ".join(sorted({*(tok.strip() for tok in old_demands.split(",")),
                                                         *(tok.strip() for tok in dmd.split(","))} - {""}))
@@ -1237,9 +1251,13 @@ class Main(QMainWindow):
 
                         pid = self._get_or_create(nome, data, cur)
 
-                        old_demands, old_enc = cur.execute(
+                        row = cur.execute(
                             "SELECT demands, encaminhamento FROM records WHERE id=?", (pid,)
                         ).fetchone()
+                        if row is None:
+                            raise RuntimeError("ID não encontrado.")
+
+                        old_demands, old_enc = row
                         old_demands = old_demands or ""
                         new_demands = ", ".join(
                             sorted({*(tok.strip() for tok in old_demands.split(",")),
@@ -1590,10 +1608,15 @@ class Main(QMainWindow):
         pid = int(tbl.item(rows[0].row(), 0).text())
 
         with sqlite3.connect(DB_PATH) as c:
-            b,l,s,d = c.execute(
+            row = c.execute(
                 "SELECT desjejum,lunch,snack,dinner FROM records WHERE id=?",
                 (pid,)
             ).fetchone()
+
+        if row is None:
+            raise RuntimeError("ID não encontrado.")
+
+        b,l,s,d = row
 
         dlg = QDialog(self); dlg.setWindowTitle("Editar Refeições 🍽️")
         lay = QFormLayout(dlg)
@@ -1632,14 +1655,19 @@ class Main(QMainWindow):
 
         # --------------- carrega dados atuais ---------------
         with sqlite3.connect(DB_PATH) as c:
-            (name, demands, prof, obs,
-             start_t, end_t, enc,
-             b, l, s, d) = c.execute("""
+            row = c.execute("""
                 SELECT patient_name, demands, reference_prof, observations,
                        start_time, end_time, encaminhamento,
                        desjejum, lunch, snack, dinner
                 FROM records WHERE id=?""", (pid,)
             ).fetchone()
+
+        if row is None:
+            raise RuntimeError("ID não encontrado.")
+
+        (name, demands, prof, obs,
+         start_t, end_t, enc,
+         b, l, s, d) = row
 
         tokens_atual = {tok.strip().split(" ")[0]
                         for tok in (demands or "").split(",") if tok}
