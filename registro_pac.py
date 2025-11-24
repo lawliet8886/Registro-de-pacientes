@@ -133,6 +133,15 @@ def update_demands(pid, new_demands, new_start=None, new_end=None, new_enc=None)
       criamos um clone “fantasma” (archived_ai = 1) apenas com o(s) AI/REA,
       refeições zeradas, para fins de estatística.
     """
+    if (new_start is None) != (new_end is None):
+        raise ValueError("new_start e new_end precisam ser fornecidos em conjunto.")
+
+    if new_start is not None:
+        start_qt = QTime.fromString(new_start, "HH:mm")
+        end_qt   = QTime.fromString(new_end,   "HH:mm")
+        if not (start_qt.isValid() and end_qt.isValid()):
+            raise ValueError("Horário inválido; use o formato HH:mm.")
+
     with sqlite3.connect(DB_PATH) as c:
         cur = c.cursor()
         row = cur.execute(

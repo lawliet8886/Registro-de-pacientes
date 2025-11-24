@@ -99,6 +99,19 @@ def test_update_demands_clones_ai_and_logs(monkeypatch, temp_db, sample_record):
         assert log_rows == [("AI, C", "C")]
 
 
+def test_update_demands_requires_start_end_pair(temp_db, sample_record):
+    with pytest.raises(ValueError):
+        registro_pac.update_demands(sample_record, "C", new_start="10:00")
+
+    with pytest.raises(ValueError):
+        registro_pac.update_demands(sample_record, "C", new_end="11:00")
+
+
+def test_update_demands_validates_time_format(temp_db, sample_record):
+    with pytest.raises(ValueError):
+        registro_pac.update_demands(sample_record, "C", new_start="25:00", new_end="26:00")
+
+
 def test_leave_record_validates_time_and_updates(temp_db, sample_record):
     pid = sample_record
 
