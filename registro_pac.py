@@ -10,6 +10,7 @@ Registro de Pacientes – v3.5 😎
 
 Requisito único: PyQt5
 """
+import logging
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,44 @@ from infra import (
     init_db,
     _fix_old_imports,
 )
+from importlib import util as importlib_util
+try:
+    import pandas as pd
+    _pandas_error = None
+except Exception as exc:
+    pd = None
+    _pandas_error = exc
+
+_xlsxwriter_available = importlib_util.find_spec("xlsxwriter") is not None
+_missing_dep_logged = False
+
+
+def _pandas_ready(parent):
+    """Verifica se pandas/xlsxwriter estão disponíveis e avisa o usuário."""
+    global _missing_dep_logged
+    missing = []
+    if pd is None:
+        missing.append("pandas")
+    if not _xlsxwriter_available:
+        missing.append("xlsxwriter")
+
+    if not missing:
+        return True
+
+    if not _missing_dep_logged:
+        logging.getLogger(__name__).warning(
+            "Dependências ausentes: %s", ", ".join(missing)
+        )
+        _missing_dep_logged = True
+
+    details = f"\nErro: {_pandas_error}" if pd is None and _pandas_error else ""
+    QMessageBox.critical(
+        parent,
+        "Dependência ausente",
+        "As funções de exportação/importação precisam de pandas e xlsxwriter\n"
+        "Instale com: pip install pandas xlsxwriter" + details,
+    )
+    return False
 from ui.dialogs import (
     EncaminhamentoDialog,
     SearchDialog,
@@ -670,6 +709,8 @@ class Main(QMainWindow):
 
 
     def exportar_dia(self):
+        if not _pandas_ready(self):
+            return
         iso = self.date.date().toString("dd/MM/yyyy")
         pacientes = self.fetch(iso, "AND left_sys IS NULL")  # já filtra/ordena
         acolh     = self._fetch_acolh(iso)              # AI/REA ativos
@@ -974,6 +1015,8 @@ class Main(QMainWindow):
 
         # ----- botão Exportar p/ Excel -----
         def _export():
+            if not _pandas_ready(self):
+                return
             df = pd.DataFrame(export_rows, columns=headers)
             nome = f"relatorio_{to_iso(f['d_ini'])}_{to_iso(f['d_end'])}.xlsx"
             caminho = Path(__file__).with_name(nome)
@@ -1156,6 +1199,8 @@ class Main(QMainWindow):
     #  Importador de Excel (rápido + progress bar)
     # ------------------------------------------------------------
     def import_excel(self):
+        if not _pandas_ready(self):
+            return
         path, _ = QFileDialog.getOpenFileName(
             self, "Escolha o arquivo Excel",
             "", "Planilhas Excel (*.xlsx)")
