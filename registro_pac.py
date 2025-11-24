@@ -1069,6 +1069,7 @@ class Main(QMainWindow):
             FROM records
             WHERE date = ?
               AND encaminhamento IS NOT NULL
+              AND archived_ai = 0
               AND left_sys IS NULL
 
             ORDER BY id DESC
