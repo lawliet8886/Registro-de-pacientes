@@ -1395,7 +1395,14 @@ class Main(QMainWindow):
             cur  = conn.cursor()
 
         row = cur.execute(
-            "SELECT id FROM records WHERE patient_name=? AND date=? AND left_sys IS NULL",
+            """
+                SELECT id
+                  FROM records
+                 WHERE patient_name=?
+                   AND date=?
+                   AND left_sys IS NULL
+                   AND archived_ai = 0
+            """,
             (name, date_iso)
         ).fetchone()
         if row:

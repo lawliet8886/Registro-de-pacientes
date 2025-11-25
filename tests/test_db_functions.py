@@ -178,6 +178,35 @@ def test_update_demands_clones_ai_and_logs(monkeypatch, temp_db, sample_record):
         assert log_rows == [("AI, C", "C")]
 
 
+def test_get_or_create_ignores_archived_clones(monkeypatch, temp_db, sample_record):
+    monkeypatch.setattr(
+        registro_pac.QTime,
+        "currentTime",
+        staticmethod(lambda: registro_pac.QTime.fromString("10:00", "HH:mm")),
+    )
+
+    registro_pac.update_demands(
+        sample_record,
+        "C",
+        new_start="11:00",
+        new_end="12:00",
+    )
+
+    with sqlite3.connect(temp_db) as c:
+        active_id = c.execute(
+            "SELECT id FROM records WHERE archived_ai=0",
+        ).fetchone()[0]
+        clone_id = c.execute(
+            "SELECT id FROM records WHERE archived_ai=1",
+        ).fetchone()[0]
+
+    dummy = type("Dummy", (), {})()
+    found_id = registro_pac.Main._get_or_create(dummy, "Paciente", "2024-01-01")
+
+    assert found_id == active_id
+    assert found_id != clone_id
+
+
 def test_update_demands_requires_start_end_pair(temp_db, sample_record):
     with pytest.raises(ValueError):
         registro_pac.update_demands(sample_record, "C", new_start="10:00")
