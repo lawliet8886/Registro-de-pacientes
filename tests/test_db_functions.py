@@ -71,6 +71,85 @@ def test_update_meals_logs_changes(temp_db, sample_record):
         assert c.execute("SELECT COUNT(*) FROM meal_log").fetchone()[0] == 1
 
 
+def test_update_meals_rejects_inactive_or_clones(temp_db):
+    registro_pac.add_record(
+        {
+            "patient_name": "Ativo",
+            "demands": "AI, C",
+            "reference_prof": "Prof",
+            "date": "2024-01-01",
+            "enter_sys": "08:00",
+            "enter_inf": "08:00",
+            "left_sys": None,
+            "left_inf": None,
+            "observations": "",
+            "encaminhamento": None,
+            "desjejum": 0,
+            "lunch": 0,
+            "snack": 0,
+            "dinner": 0,
+            "start_time": "09:00",
+            "end_time": "10:00",
+            "archived_ai": 0,
+        }
+    )
+    registro_pac.add_record(
+        {
+            "patient_name": "Inativo",
+            "demands": "AI, C",
+            "reference_prof": "Prof",
+            "date": "2024-01-01",
+            "enter_sys": "08:00",
+            "enter_inf": "08:00",
+            "left_sys": "10:00",
+            "left_inf": "10:00",
+            "observations": "",
+            "encaminhamento": None,
+            "desjejum": 0,
+            "lunch": 0,
+            "snack": 0,
+            "dinner": 0,
+            "start_time": "09:00",
+            "end_time": "10:00",
+            "archived_ai": 0,
+        }
+    )
+    registro_pac.add_record(
+        {
+            "patient_name": "Clone",
+            "demands": "AI",
+            "reference_prof": "Prof",
+            "date": "2024-01-01",
+            "enter_sys": "08:00",
+            "enter_inf": "08:00",
+            "left_sys": None,
+            "left_inf": None,
+            "observations": "",
+            "encaminhamento": None,
+            "desjejum": 0,
+            "lunch": 0,
+            "snack": 0,
+            "dinner": 0,
+            "start_time": "09:00",
+            "end_time": "10:00",
+            "archived_ai": 1,
+        }
+    )
+
+    with sqlite3.connect(temp_db) as c:
+        active_id, inactive_id, clone_id = [row[0] for row in c.execute("SELECT id FROM records ORDER BY id")]
+
+    registro_pac.update_meals(active_id, 1, 1, 1, 1)
+    with sqlite3.connect(temp_db) as c:
+        assert c.execute("SELECT desjejum,lunch,snack,dinner FROM records WHERE id=?", (active_id,)).fetchone() == (1, 1, 1, 1)
+
+    with pytest.raises(ValueError):
+        registro_pac.update_meals(inactive_id, 1, 1, 1, 1)
+
+    with pytest.raises(ValueError):
+        registro_pac.update_meals(clone_id, 1, 1, 1, 1)
+
+
 def test_update_demands_clones_ai_and_logs(monkeypatch, temp_db, sample_record):
     pid = sample_record
     monkeypatch.setattr(
