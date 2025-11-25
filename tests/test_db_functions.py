@@ -200,6 +200,59 @@ def test_reactivate_from_validates_active_records(temp_db, sample_record):
         registro_pac.reactivate_from(sample_record, enter_sys="08:30", enter_inf="08:30")
 
 
+def test_rollover_an_ignores_archived_clones(monkeypatch, temp_db):
+    monkeypatch.setattr(
+        registro_pac.QTime,
+        "currentTime",
+        staticmethod(lambda: registro_pac.QTime.fromString("09:00", "HH:mm")),
+    )
+
+    registro_pac.add_record(
+        {
+            "patient_name": "Paciente",
+            "demands": "AI, AN Entrou",
+            "reference_prof": "Prof",
+            "date": "01/01/2024",
+            "enter_sys": "08:00",
+            "enter_inf": "08:00",
+            "left_sys": None,
+            "left_inf": None,
+            "observations": "",
+            "encaminhamento": None,
+            "desjejum": 0,
+            "lunch": 0,
+            "snack": 0,
+            "dinner": 0,
+            "start_time": "09:00",
+            "end_time": "10:00",
+            "archived_ai": 0,
+        }
+    )
+
+    with sqlite3.connect(temp_db) as c:
+        record_id = c.execute("SELECT id FROM records").fetchone()[0]
+
+    registro_pac.update_demands(record_id, "AN")
+
+    with sqlite3.connect(temp_db) as c:
+        clone_id = c.execute("SELECT id FROM records WHERE archived_ai=1").fetchone()[0]
+        c.execute(
+            "UPDATE records SET left_sys=?, left_inf=? WHERE id=?",
+            ("10:00", "10:00", record_id),
+        )
+        c.execute("UPDATE records SET demands=? WHERE id=?", ("AN", clone_id))
+        c.commit()
+
+    dummy_main = type("Dummy", (), {})()
+    registro_pac.Main._rollover_an(dummy_main, "02/01/2024")
+
+    with sqlite3.connect(temp_db) as c:
+        assert (
+            c.execute("SELECT COUNT(*) FROM records WHERE date=?", ("02/01/2024",)).fetchone()[0]
+            == 0
+        )
+
+
 def test_counts_ignores_left_records(temp_db):
     registro_pac.add_record(
         {

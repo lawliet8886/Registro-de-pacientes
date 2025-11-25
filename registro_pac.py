@@ -1172,7 +1172,7 @@ class Main(QMainWindow):
                        desjejum, lunch, snack, dinner,
                        start_time, end_time
                   FROM records
-                 WHERE date=? AND left_sys IS NULL
+                 WHERE date=? AND left_sys IS NULL AND archived_ai = 0
             """, (prev_iso,)).fetchall()
 
             for row in rows:
