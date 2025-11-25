@@ -126,14 +126,20 @@ def add_record(row: dict):
 def update_meals(pid, new_b, new_l, new_s, new_d):
     with get_conn() as c:
         row = c.execute(
-            "SELECT desjejum,lunch,snack,dinner FROM records WHERE id=?",
-            (pid,)
+            "SELECT desjejum,lunch,snack,dinner,left_sys,archived_ai FROM records WHERE id=?",
+            (pid,),
         ).fetchone()
 
         if row is None:
             raise RuntimeError("ID não encontrado.")
 
-        old_b, old_l, old_s, old_d = row
+        old_b, old_l, old_s, old_d, left_sys, archived_ai = row
+
+        if left_sys is not None:
+            raise ValueError("Só é possível editar refeições de registros ativos.")
+
+        if archived_ai:
+            raise ValueError("Este registro é um clone arquivado e não pode ser editado.")
 
         if (old_b, old_l, old_s, old_d) == (new_b, new_l, new_s, new_d):
             return  # nada mudou
@@ -143,7 +149,7 @@ def update_meals(pid, new_b, new_l, new_s, new_d):
             WHERE id=?
         """, (new_b, new_l, new_s, new_d, pid))
 
-        # ⚠️ AGORA são 10 placeholders (record_id + 9 valores) 👇
+        # ⚠️	AGORA são 10 placeholders (record_id + 9 valores) 👇
         c.execute("""
             INSERT INTO meal_log (
                 record_id, ts,
@@ -1697,14 +1703,30 @@ class Main(QMainWindow):
 
         with get_conn() as c:
             row = c.execute(
-                "SELECT desjejum,lunch,snack,dinner FROM records WHERE id=?",
-                (pid,)
+                "SELECT desjejum,lunch,snack,dinner,left_sys,archived_ai FROM records WHERE id=?",
+                (pid,),
             ).fetchone()
 
         if row is None:
             raise RuntimeError("ID não encontrado.")
 
-        b,l,s,d = row
+        b,l,s,d,left_sys,archived_ai = row
+
+        if left_sys is not None:
+            QMessageBox.warning(
+                self,
+                "Aviso ⚠️",
+                "Não é possível editar refeições de registros encerrados. Reative o paciente primeiro.",
+            )
+            return
+
+        if archived_ai:
+            QMessageBox.warning(
+                self,
+                "Aviso ⚠️",
+                "Este registro é um clone arquivado (AI/REA) e não pode ser editado.",
+            )
+            return
 
         dlg = QDialog(self); dlg.setWindowTitle("Editar Refeições 🍽️")
         lay = QFormLayout(dlg)
@@ -1729,7 +1751,8 @@ class Main(QMainWindow):
             QMessageBox.critical(self, "Erro ❌", str(exc))
 
 
-    # ------------------------------------------------------------
+
+# ------------------------------------------------------------
     #  EDITAR REGISTRO (nome, prof., obs, demandas, refeições)
     # ------------------------------------------------------------
     def edit_record(self):
