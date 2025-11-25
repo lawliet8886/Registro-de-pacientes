@@ -930,7 +930,7 @@ class Main(QMainWindow):
         """Converte dd/MM/yyyy em yyyymmdd para filtros SQL."""
         return d[6:10] + d[3:5] + d[0:2]
 
-    def _query_by_filters(self, f: dict, *, include_archived: bool = True):
+    def _query_by_filters(self, f: dict, *, include_archived: bool = False):
         """Monta e executa a query de busca, compartilhada por relatórios."""
 
         select_cols = [
@@ -1005,7 +1005,7 @@ class Main(QMainWindow):
             return
 
         f = dlg.filters()
-        rows = self._query_by_filters(f)
+        rows = self._query_by_filters(f, include_archived=False)
 
         if not rows:
             QMessageBox.information(self, "Busca", "Nenhum resultado encontrado.")

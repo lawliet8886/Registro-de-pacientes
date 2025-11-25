@@ -233,6 +233,80 @@ def test_update_demands_requires_start_end_pair(temp_db, sample_record):
         registro_pac.update_demands(sample_record, "C", new_end="11:00")
 
 
+def test_search_excludes_archived_clones(temp_db):
+    registro_pac.add_record(
+        {
+            "patient_name": "Ativo",
+            "demands": "AI, C",
+            "reference_prof": "Prof",
+            "date": "2024-01-01",
+            "enter_sys": "08:00",
+            "enter_inf": "08:00",
+            "left_sys": None,
+            "left_inf": None,
+            "observations": "",
+            "encaminhamento": None,
+            "desjejum": 1,
+            "lunch": 1,
+            "snack": 1,
+            "dinner": 1,
+            "start_time": "09:00",
+            "end_time": "10:00",
+            "archived_ai": 0,
+        }
+    )
+    registro_pac.add_record(
+        {
+            "patient_name": "Clone",
+            "demands": "AI",
+            "reference_prof": "Prof",
+            "date": "2024-01-01",
+            "enter_sys": "08:00",
+            "enter_inf": "08:00",
+            "left_sys": None,
+            "left_inf": None,
+            "observations": "",
+            "encaminhamento": None,
+            "desjejum": 1,
+            "lunch": 1,
+            "snack": 1,
+            "dinner": 1,
+            "start_time": "09:00",
+            "end_time": "10:00",
+            "archived_ai": 1,
+        }
+    )
+
+    filters = {
+        "d_ini": "01/01/2024",
+        "d_end": "01/01/2024",
+        "adv": False,
+        "name": "",
+        "prof": "",
+        "dmd": "",
+        "enc": None,
+        "b": False,
+        "l": False,
+        "s": False,
+        "d": False,
+        "active_only": True,
+    }
+
+    dummy_main = registro_pac.Main.__new__(registro_pac.Main)
+    rows = dummy_main._query_by_filters(filters)
+
+    assert [r[1] for r in rows] == ["Ativo"]
+
+    export_rows = []
+    for row in rows:
+        row_list = list(row)
+        for col in (3, 4, 5, 6):
+            row_list[col] = "✔️" if row_list[col] else ""
+        export_rows.append(row_list)
+
+    assert all("Clone" not in r for r in export_rows)
+
+
 def test_import_excel_normalizes_date_and_time(monkeypatch, tmp_path, qapp):
     db_file = tmp_path / "patients.db"
     monkeypatch.setattr(registro_pac.infra, "DB_PATH", db_file)
