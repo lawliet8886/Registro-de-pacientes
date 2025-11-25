@@ -1234,11 +1234,31 @@ class Main(QMainWindow):
         if not path:
             return
 
+        def _normalize_date(value):
+            try:
+                ts = pd.to_datetime(value, errors="coerce", dayfirst=True)
+            except Exception:
+                return None
+            if pd.isna(ts):
+                return None
+            return ts.date().isoformat()
+
+        def _normalize_time(value):
+            if value is None:
+                return None
+            texto = str(value).strip()
+            if not texto or texto.lower() == "nan":
+                return None
+            qt = QTime.fromString(texto, "HH:mm")
+            return qt.toString("HH:mm") if qt.isValid() else False
+
         try:
             wb = pd.read_excel(path, sheet_name=None, header=None)
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Falha lendo Excel:\n{e}")
             return
+
+        invalid_rows = []
 
         # ------------ conta linhas relevantes p/ barra ------------
         total_rows = 0
@@ -1278,11 +1298,17 @@ class Main(QMainWindow):
                         nome  = str(row[0]).strip()
                         dmd   = str(row[1]).strip()
                         prof  = str(row[2]).strip()
-                        data  = str(row[3]).strip()
-                        hora  = str(row[4]).strip()
+                        data  = _normalize_date(row[3])
+                        hora  = _normalize_time(row[4])
                         obs   = str(row[5]).strip()
 
                         if not nome or not data:
+                            if nome or data:
+                                invalid_rows.append((sheet_name, nome or "(sem nome)", "data inválida"))
+                            continue
+
+                        if hora is False:
+                            invalid_rows.append((sheet_name, nome, "hora inválida"))
                             continue
 
                         # dentro do loop for _, row in df.iterrows():
@@ -1312,7 +1338,7 @@ class Main(QMainWindow):
                                 vals.append(1)
 
                         # --- ACERTA horário de entrada -----------------------------------
-                        if hora and str(hora).lower() != "nan":
+                        if hora:
                             sets += ["enter_inf=?", "enter_sys=?"]   # grava nos dois campos
                             vals += [hora, hora]
 
@@ -1336,11 +1362,17 @@ class Main(QMainWindow):
                         dmd   = str(row[1]).strip()
                         enc   = str(row[2]).strip()
                         prof  = str(row[3]).strip()
-                        data  = str(row[4]).strip()
-                        hora  = str(row[5]).strip()
+                        data  = _normalize_date(row[4])
+                        hora  = _normalize_time(row[5])
                         obs   = str(row[6]).strip()
 
                         if not nome or not data:
+                            if nome or data:
+                                invalid_rows.append((sheet_name, nome or "(sem nome)", "data inválida"))
+                            continue
+
+                        if hora is False:
+                            invalid_rows.append((sheet_name, nome, "hora inválida"))
                             continue
 
                         pid = self._get_or_create(nome, data, cur)
@@ -1382,6 +1414,13 @@ class Main(QMainWindow):
             progress.close()
 
         self.refresh()
+        if invalid_rows:
+            detalhes = "\n".join(f"• {sh}: {nm} ({motivo})" for sh, nm, motivo in invalid_rows)
+            QMessageBox.warning(
+                self,
+                "Linhas ignoradas",
+                "Algumas linhas foram puladas por dados inválidos:\n" + detalhes,
+            )
         QMessageBox.information(
             self, "Importação concluída",
             f"{processed} linhas importadas de\n{Path(path).name}")

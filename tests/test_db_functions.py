@@ -1,18 +1,36 @@
 import sqlite3
+import sys
+from pathlib import Path
 
+import pandas as pd
 import pytest
+
+repo_root = Path(__file__).resolve().parents[1]
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 
 pytest.importorskip("PyQt5")
 
-import registro_pac
+try:
+    import registro_pac
+except Exception as exc:  # pragma: no cover - environment guard
+    pytest.skip(f"registro_pac import failed: {exc}", allow_module_level=True)
 
 
 @pytest.fixture
 def temp_db(monkeypatch, tmp_path):
     db_file = tmp_path / "patients.db"
-    monkeypatch.setattr(registro_pac, "DB_PATH", db_file)
+    monkeypatch.setattr(registro_pac.infra, "DB_PATH", db_file)
     registro_pac.init_db()
     return db_file
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    from PyQt5.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    return app or QApplication([])
 
 
 @pytest.fixture
@@ -213,6 +231,93 @@ def test_update_demands_requires_start_end_pair(temp_db, sample_record):
 
     with pytest.raises(ValueError):
         registro_pac.update_demands(sample_record, "C", new_end="11:00")
+
+
+def test_import_excel_normalizes_date_and_time(monkeypatch, tmp_path, qapp):
+    db_file = tmp_path / "patients.db"
+    monkeypatch.setattr(registro_pac.infra, "DB_PATH", db_file)
+    registro_pac.init_db()
+
+    excel_path = tmp_path / "planilha.xlsx"
+    df = pd.DataFrame(
+        [
+            ["Valido", "C", "Prof", pd.Timestamp("2024-02-01"), "07:30", "Obs"],
+            ["Invalido", "C", "Prof", pd.Timestamp("2024-02-01"), "25:00", "Obs"],
+            ["HoraVazia", "C", "Prof", pd.Timestamp("2024-02-02"), "", "Obs"],
+        ]
+    )
+    with pd.ExcelWriter(excel_path) as writer:
+        df.to_excel(writer, index=False, header=False, sheet_name="pacientes")
+
+    messages = []
+
+    class DummyMsgBox:
+        @staticmethod
+        def warning(parent, title, text):
+            messages.append(("warning", title, text))
+
+        @staticmethod
+        def information(parent, title, text):
+            messages.append(("info", title, text))
+
+        @staticmethod
+        def critical(parent, title, text):
+            messages.append(("critical", title, text))
+
+    monkeypatch.setattr(registro_pac, "QMessageBox", DummyMsgBox)
+    monkeypatch.setattr(
+        registro_pac.QFileDialog,
+        "getOpenFileName",
+        staticmethod(lambda *args, **kwargs: (str(excel_path), "")),
+    )
+
+    class DummyProgress:
+        def __init__(self, *args, **kwargs):
+            self._value = 0
+
+        def setWindowModality(self, *args, **kwargs):
+            pass
+
+        def setMinimumWidth(self, *args, **kwargs):
+            pass
+
+        def setValue(self, value):
+            self._value = value
+
+        def wasCanceled(self):
+            return False
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(registro_pac, "QProgressDialog", DummyProgress)
+
+    monkeypatch.setattr(
+        registro_pac.QTime,
+        "currentTime",
+        staticmethod(lambda: registro_pac.QTime.fromString("10:00", "HH:mm")),
+    )
+
+    class DummyMain(registro_pac.QMainWindow):
+        _get_or_create = registro_pac.Main._get_or_create
+        import_excel = registro_pac.Main.import_excel
+
+        def refresh(self):
+            pass
+
+    DummyMain().import_excel()
+
+    with sqlite3.connect(db_file) as c:
+        rows = c.execute(
+            "SELECT patient_name,date,enter_inf FROM records ORDER BY patient_name"
+        ).fetchall()
+
+    assert rows == [
+        ("HoraVazia", "2024-02-02", "10:00"),
+        ("Valido", "2024-02-01", "07:30"),
+    ]
+    warning_messages = [msg for msg in messages if msg[0] == "warning"]
+    assert warning_messages and "hora inválida" in warning_messages[0][2]
 
 
 def test_update_demands_validates_time_format(temp_db, sample_record):
