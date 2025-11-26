@@ -61,6 +61,18 @@ def sample_record(temp_db):
         return c.execute("SELECT id FROM records").fetchone()[0]
 
 
+def test_get_conn_sets_pragmas(monkeypatch, tmp_path):
+    db_file = tmp_path / "patients.db"
+    monkeypatch.setattr(infra, "DB_PATH", db_file)
+
+    with infra.get_conn(timeout=1.5) as conn:
+        journal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        busy_timeout = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+
+    assert journal_mode == "wal"
+    assert busy_timeout == 1500
+
+
 def test_init_db_creates_tables_and_columns(temp_db):
     with sqlite3.connect(temp_db) as c:
         tables = {row[0] for row in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
