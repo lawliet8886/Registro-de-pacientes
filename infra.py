@@ -15,7 +15,8 @@ CONFIG_FILE = Path(__file__).with_name("settings.json")
 def get_conn(timeout: int = 30) -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, timeout=timeout)
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=?", (int(timeout * 1000),))
+    busy_ms = int(timeout * 1000)
+    conn.execute(f"PRAGMA busy_timeout={busy_ms}")
     return conn
 
 
