@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import infra
 
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
@@ -20,7 +21,7 @@ except Exception as exc:  # pragma: no cover - environment guard
 @pytest.fixture
 def temp_db(monkeypatch, tmp_path):
     db_file = tmp_path / "patients.db"
-    monkeypatch.setattr(registro_pac.infra, "DB_PATH", db_file)
+    monkeypatch.setattr(infra, "DB_PATH", db_file)
     registro_pac.init_db()
     return db_file
 
